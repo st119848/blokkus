@@ -270,6 +270,18 @@ function castPieceShadow() {
 	}
 }
 
+function updatePlacementConfirmation() {
+	if (currentPiece && currentStud && isValidPosition()) {
+		// Keep the latest valid preview location ready for the confirm button.
+		pendingStud = currentStud
+		$('#confirmPlacementBtn').prop('hidden', false)
+	}
+	else {
+		pendingStud = null
+		$('#confirmPlacementBtn').prop('hidden', true)
+	}
+}
+
 // Place the piece on the board (essentially deletes the mesh and creates a new one)
 function placePiece() {	
 	currentPiece.isPlaced = true
@@ -694,6 +706,7 @@ function animate() {
 				castPieceShadow()
 			}
 		}
+		updatePlacementConfirmation()
 
 		// Raycast the current player's pieces
 		for (const piece of currentPlayer.pieces) {
