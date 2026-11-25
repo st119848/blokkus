@@ -48,6 +48,13 @@ const raycaster = new THREE.Raycaster()
 // For storing the mouse position on a scale from -1 to +1
 var mouse = new THREE.Vector2()
 
+// Touch taps are handled separately from clicks because camera-controls
+// consumes touch gestures for orbiting and browsers do not always synthesize
+// a click after preventDefault() is called on touchstart.
+var touchStartPosition = null
+var touchMoved = false
+var ignoreNextClick = false
+
 // For storing the board
 var board = new Board(scene)
 
@@ -386,18 +393,36 @@ function blinkStud(stud) {
 	stud.material.color.set(currentBlinkColor)
 }
 
+function setPointerPosition(clientX, clientY) {
+	const rect = renderer.domElement.getBoundingClientRect()
+	mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1
+	mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1
+}
+
+function rotateCurrentPiece() {
+	if (currentPiece)
+		currentPiece.rotate(1)
+}
+
+function flipCurrentPiece() {
+	if (currentPiece)
+		currentPiece.flip()
+}
+
+window.rotatePiece = rotateCurrentPiece
+window.flipPiece = flipCurrentPiece
+
 
 // ===========
 //  LISTENERS
 // ===========
 
-$(document).mousemove(function() {
-	// Calculates and stores mouse position on a scale from -1 to +1
-	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-	mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+$(document).mousemove(function(event) {
+	// Calculates and stores pointer position on a scale from -1 to +1
+	setPointerPosition(event.clientX, event.clientY)
 })
 
-$(document).click(function() {
+function handleBoardInteraction() {
 	raycasting: {
 
 		// Do nothing if the user clicks when it isn't a player's turn
@@ -450,14 +475,65 @@ $(document).click(function() {
 		else if (raycaster.intersectObject(board.mesh)[0]) {} // Do nothing
 
 	}
+}
+
+$(document).click(function() {
+	if (ignoreNextClick) {
+		ignoreNextClick = false
+		return
+	}
+	handleBoardInteraction()
+})
+
+$(document).on('touchstart', function(event) {
+	if (event.target !== renderer.domElement)
+		return
+	if (event.originalEvent.touches.length !== 1)
+		return
+
+	const touch = event.originalEvent.touches[0]
+	touchStartPosition = { x: touch.clientX, y: touch.clientY }
+	touchMoved = false
+	setPointerPosition(touch.clientX, touch.clientY)
+})
+
+$(document).on('touchmove', function(event) {
+	if (event.target !== renderer.domElement)
+		return
+	const touch = event.originalEvent.touches[0]
+	if (!touch)
+		return
+
+	setPointerPosition(touch.clientX, touch.clientY)
+	if (touchStartPosition) {
+		const dx = touch.clientX - touchStartPosition.x
+		const dy = touch.clientY - touchStartPosition.y
+		touchMoved = touchMoved || Math.hypot(dx, dy) > 10
+	}
+})
+
+$(document).on('touchend', function(event) {
+	if (event.target !== renderer.domElement)
+		return
+	const touch = event.originalEvent.changedTouches[0]
+	if (!touch || !touchStartPosition)
+		return
+
+	setPointerPosition(touch.clientX, touch.clientY)
+	if (!touchMoved) {
+		// Prevent the synthetic click from placing/deselecting a second time.
+		ignoreNextClick = true
+		handleBoardInteraction()
+	}
+	touchStartPosition = null
 })
 
 $(document).keydown(function(e){
 	if(e.keyCode == 90 && currentPiece){
-		currentPiece.rotate(1)
+		rotateCurrentPiece()
 	}
 	if(e.keyCode == 88 && currentPiece){
-		currentPiece.flip()
+		flipCurrentPiece()
 	}
 })
 

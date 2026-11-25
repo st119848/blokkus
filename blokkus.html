@@ -3,6 +3,7 @@
 
 <head>
 	<title>Blokkus</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 	<!-- Icon -->
 	<link rel="icon" href="resources/static/icon.ico">
 	<!-- CSS -->
@@ -30,9 +31,12 @@
 			<p id="player-name" class="font-large text-black w-100 overflow-hidden"></p>
 			<p id="player-score" class="text-black"></p>
 		</div>
-		<p>[Z] Rotate Piece</p>
-		<p>[X] Flip Piece</p>
-		<p>[Scroll] Zoom In/Out</p>
+		<div class="piece-controls" aria-label="Piece controls">
+			<button class="btn" type="button" onclick="rotatePiece()" aria-label="Rotate piece">↻ Rotate</button>
+			<button class="btn" type="button" onclick="flipPiece()" aria-label="Flip piece">⇄ Flip</button>
+		</div>
+		<p class="keyboard-hint">[Z] Rotate · [X] Flip · [Scroll] Zoom</p>
+		<p class="touch-hint">Tap a piece, then tap a board square. Drag to orbit.</p>
 		<button id="toggleView" class="btn" onclick="toggleView()">View from Above</button>
 	</div>
 	<button id="forfeitBtn" class="floating container fixed-right fixed-bottom btn btn-red" onclick="forfeit()">
