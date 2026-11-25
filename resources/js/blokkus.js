@@ -32,15 +32,18 @@ const clock = new THREE.Clock()
 CameraControls.install( { THREE: THREE } )
 const cameraControls = new CameraControls(camera, renderer.domElement)
 cameraControls.setTarget(0,-15,0)
-cameraControls.minDistance = 25
-cameraControls.maxDistance = 40
+cameraControls.minDistance = 0.1
+cameraControls.maxDistance = Infinity
 cameraControls.mouseButtons.left = CameraControls.ACTION.NONE
 cameraControls.mouseButtons.right = CameraControls.ACTION.NONE
+cameraControls.touches.one = CameraControls.ACTION.NONE
+cameraControls.touches.two = CameraControls.ACTION.TOUCH_DOLLY
+cameraControls.rotateTo(0, 0, false)
 
 // Used to track the angles of the camera (azimuthal is side-to-side and polar is up-down)
 // In degrees
 var currentAzimuthalAngle = 0
-var currentPolarAngle = 30
+var currentPolarAngle = 0
 
 // For raycasting
 const raycaster = new THREE.Raycaster()
@@ -365,6 +368,7 @@ window.forfeit = function() {
 		remainingPlayers--
 
 		if (currentPiece) {
+			setPieceHighlight(currentPiece, false)
 			dropPieceAnimation(currentPiece, -0.5)
 			currentPiece = null
 		}
@@ -417,8 +421,44 @@ function refreshCurrentPieceMesh(transform) {
 			}
 			scene.add(piece.mesh)
 			piece.mesh.position.copy(position)
+			setPieceHighlight(piece, true)
 		})
 	})
+}
+
+function addAnchorMarker(piece) {
+	const geometry = new THREE.Geometry()
+	geometry.vertices.push(
+		new THREE.Vector3(-0.38, 1.1, 0), new THREE.Vector3(0.38, 1.1, 0),
+		new THREE.Vector3(0, 1.1, -0.38), new THREE.Vector3(0, 1.1, 0.38)
+	)
+	const material = new THREE.LineBasicMaterial({
+		color: 0xffffff,
+		depthTest: false,
+		transparent: true,
+		opacity: 0.95
+	})
+	const marker = new THREE.LineSegments(geometry, material)
+	marker.renderOrder = 10
+	piece.mesh.add(marker)
+	piece.anchorMarker = marker
+}
+
+function setPieceHighlight(piece, selected) {
+	if (!piece || !piece.mesh)
+		return
+
+	const material = piece.mesh.material
+	material.color.set(selected ? 0xffa500 : piece.baseColor)
+	material.emissive.set(selected ? 0x663300 : 0x000000)
+	if (selected && !piece.anchorMarker)
+		addAnchorMarker(piece)
+	if (!selected && piece.anchorMarker) {
+		piece.mesh.remove(piece.anchorMarker)
+		piece.anchorMarker.geometry.dispose()
+		piece.anchorMarker.material.dispose()
+		piece.anchorMarker = null
+	}
 }
 
 function flipCurrentPiece() {
@@ -488,6 +528,7 @@ function handleBoardInteraction() {
 				if (currentPiece) {
 					// Deselect the currentPiece if it is the clicked object
 					if (raycaster.intersectObject(currentPiece.mesh)[0]) {
+						setPieceHighlight(currentPiece, false)
 						dropPieceAnimation(currentPiece, -0.5)
 						currentPiece = null
 						pendingStud = null
@@ -495,12 +536,14 @@ function handleBoardInteraction() {
 						break raycasting
 					}
 					// Drop the previous current piece
+					setPieceHighlight(currentPiece, false)
 					dropPieceAnimation(currentPiece, -0.5)
 					pendingStud = null
 					$('#confirmPlacementBtn').prop('hidden', true)
 				}
 				// Set the clicked piece to the new current piece
 				currentPiece = piece
+				setPieceHighlight(currentPiece, true)
 				// Raise the new current piece
 				currentPiece.animationFrame = raisePieceAnimation(currentPiece, 0.5)
 				// Break (i.e. don't raycast any other pieces)

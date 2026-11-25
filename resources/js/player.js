@@ -79,6 +79,7 @@ class Player {
 		let rotatedMatrix = new THREE.Matrix4().makeRotationY( toRadians(angle) )
 
 		for (const [i, piece] of pieces.entries()) {
+			piece.baseColor = this.color
 			piece.createPieceMesh(this.color).then( () => {
 
 				piece.mesh.position.set(pos[i].x,-0.5,pos[i].z).applyMatrix4(rotatedMatrix)
