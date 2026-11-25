@@ -67,6 +67,7 @@ var colorIncrement = 0x020202
 
 // For storing the currently selected piece
 var currentPiece
+var pendingStud = null
 
 // Array from storing the players
 var players = []
@@ -303,8 +304,6 @@ function nextPlayer(enableTransition=true) {
 		// Next player
 		currentPlayerIndex = ++currentPlayerIndex % totalPlayers
 		currentPlayer = players[currentPlayerIndex]
-		viewFromSide()
-		rotate(enableTransition)
 	} while (currentPlayer.continue != true && remainingPlayers > 0)
 	$('#player-name').text(`${currentPlayer.name}`)
 	$('#player-score').text(`Score: ${currentPlayer.score}`)
@@ -324,9 +323,6 @@ function gameEnd() {
 	
 	`)
 	currentPlayer = null
-	currentAzimuthalAngle -= currentAzimuthalAngle % 90
-	cameraControls.dampingFactor = 0.02
-	cameraControls.rotateTo( toRadians(currentAzimuthalAngle) , 0, true)
 }
 
 function raisePieceAnimation(piece, height) {
@@ -399,18 +395,68 @@ function setPointerPosition(clientX, clientY) {
 	mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1
 }
 
-function rotateCurrentPiece() {
-	if (currentPiece)
-		currentPiece.rotate(1)
+function refreshCurrentPieceMesh(transform) {
+	const piece = currentPiece
+	const player = currentPlayer
+	if (!piece || !player || piece.isPlaced)
+		return
+	pendingStud = null
+	$('#confirmPlacementBtn').prop('hidden', true)
+
+	// Queue rotations so repeated taps cannot replace the preview mesh out of order.
+	piece.meshRefresh = (piece.meshRefresh || Promise.resolve()).then(() => {
+		transform()
+		const oldMesh = piece.mesh
+		const position = oldMesh ? oldMesh.position.clone() : new THREE.Vector3(0, 0.5, 0)
+
+		return piece.createPieceMesh(player.color).then(() => {
+			if (oldMesh) {
+				scene.remove(oldMesh)
+				oldMesh.geometry.dispose()
+				oldMesh.material.dispose()
+			}
+			scene.add(piece.mesh)
+			piece.mesh.position.copy(position)
+		})
+	})
 }
 
 function flipCurrentPiece() {
 	if (currentPiece)
-		currentPiece.flip()
+		refreshCurrentPieceMesh(() => currentPiece.flip())
+}
+
+function rotateCurrentPiece() {
+	if (currentPiece)
+		refreshCurrentPieceMesh(() => currentPiece.rotate(1))
 }
 
 window.rotatePiece = rotateCurrentPiece
 window.flipPiece = flipCurrentPiece
+
+window.confirmPlacement = function() {
+	if (!currentPlayer || !currentPiece || !pendingStud)
+		return
+
+	currentStud = pendingStud
+	if (!isValidPosition()) {
+		pendingStud = null
+		$('#confirmPlacementBtn').prop('hidden', true)
+		return
+	}
+
+	currentPlayer.score += currentPiece.score
+	$('#player-score').text(`Score: ${currentPlayer.score}`)
+	pendingStud = null
+	$('#confirmPlacementBtn').prop('hidden', true)
+	if (remainingPlayers > 1) {
+		placePiece().then(nextPlayer)
+		currentPlayer = null
+	}
+	else {
+		placePiece()
+	}
+}
 
 
 // ===========
@@ -444,10 +490,14 @@ function handleBoardInteraction() {
 					if (raycaster.intersectObject(currentPiece.mesh)[0]) {
 						dropPieceAnimation(currentPiece, -0.5)
 						currentPiece = null
+						pendingStud = null
+						$('#confirmPlacementBtn').prop('hidden', true)
 						break raycasting
 					}
 					// Drop the previous current piece
 					dropPieceAnimation(currentPiece, -0.5)
+					pendingStud = null
+					$('#confirmPlacementBtn').prop('hidden', true)
 				}
 				// Set the clicked piece to the new current piece
 				currentPiece = piece
@@ -460,15 +510,8 @@ function handleBoardInteraction() {
 
 		// If the player clicks on a stud
 		if (currentPiece && currentStud && isValidPosition()) {
-			currentPlayer.score += currentPiece.score
-			$('#player-score').text(`Score: ${currentPlayer.score}`)
-			if (remainingPlayers > 1) {
-				placePiece().then(nextPlayer)
-				currentPlayer = null
-			}
-			else {
-				placePiece()
-			}
+			pendingStud = currentStud
+			$('#confirmPlacementBtn').prop('hidden', false)
 		}
 
 		// If the player clicks on the board (not the studs)
@@ -477,7 +520,9 @@ function handleBoardInteraction() {
 	}
 }
 
-$(document).click(function() {
+$(document).click(function(event) {
+	if (event.target !== renderer.domElement)
+		return
 	if (ignoreNextClick) {
 		ignoreNextClick = false
 		return

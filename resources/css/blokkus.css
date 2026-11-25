@@ -46,6 +46,8 @@ img {height:1.5rem; vertical-align:middle;}
 .overflow-hidden {white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .piece-controls {display:flex; gap:.45rem; flex-wrap:wrap;}
 .piece-controls .btn {padding:.45rem .6rem;}
+.btn-confirm {background-color:#176b3a; font-weight:bold;}
+.btn-confirm:hover {background-color:#2ca866; color:white;}
 .touch-hint {display:none; max-width:18rem;}
 
 @media (hover:none), (pointer:coarse) {
